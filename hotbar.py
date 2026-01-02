@@ -81,15 +81,26 @@ class Hotbar(Entity):
             )
             self.slot_backgrounds.append(bg)
             
-            # Block color indicator
+            # Block texture icon using the texture atlas
+            # Get the texture index for this block's top face
+            from voxel import BLOCK_TEXTURES, Face, ATLAS_WIDTH
+            texture_index = BLOCK_TEXTURES.get(block_type, {}).get(Face.TOP, 0)
+            
             block_indicator = Entity(
                 parent=self,
                 model='quad',
                 scale=(slot_size * 0.7, slot_size * 0.7),
                 position=(x_pos, -0.42),
-                color=BLOCK_COLORS.get(block_type, color.white),
+                texture='assets/texture_atlas.png',
                 z=0
             )
+            
+            # Set UV coordinates to show just this block's texture
+            u_start = texture_index / ATLAS_WIDTH
+            u_end = (texture_index + 1) / ATLAS_WIDTH
+            block_indicator.texture_scale = (1/ATLAS_WIDTH, 1)
+            block_indicator.texture_offset = (u_start, 0)
+            
             self.slots.append(block_indicator)
             
             # Slot number
