@@ -324,16 +324,16 @@ def main():
     
     input_handler = InputHandler()
     
-    # Update function called every frame
-    def update():
-        # Update chunk loading based on player position
-        world.load_chunks_around(player.position.x, player.position.y, player.position.z)
-        
-        # Update frustum culling
-        world.update_frustum_culling()
+    # Game loop entity - handles chunk loading and frustum culling
+    class GameLoop(Entity):
+        def update(self):
+            # Update chunk loading based on player position
+            world.load_chunks_around(player.position.x, player.position.y, player.position.z)
+            
+            # Update frustum culling
+            world.update_frustum_culling()
     
-    # Assign update function
-    app.update = update
+    game_loop = GameLoop()
     
     # Run the application
     app.run()

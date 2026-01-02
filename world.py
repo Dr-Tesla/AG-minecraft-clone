@@ -19,7 +19,7 @@ from voxel import BlockType
 from noise import get_terrain_height
 
 # How many chunks to load around the player
-RENDER_DISTANCE = 4  # chunks in each direction
+RENDER_DISTANCE = 3  # chunks in each direction
 
 
 class World(Entity):
@@ -37,6 +37,11 @@ class World(Entity):
         
         # Track player's last chunk position for loading updates
         self._last_player_chunk: Optional[Tuple[int, int, int]] = None
+        
+        # Chunk loading queue for gradual loading (prevents frame stutter)
+        self._chunk_load_queue: List[Tuple[int, int, int]] = []
+        self._chunks_per_frame = 2  # Load 2 chunks per frame max
+        self._initial_load_complete = False  # First load is synchronous
     
     def get_chunk(self, chunk_pos: Tuple[int, int, int]) -> Optional[Chunk]:
         """Get a chunk by its chunk coordinates."""
@@ -173,10 +178,8 @@ class World(Entity):
         """
         center_chunk = world_to_chunk_pos(int(center_x), int(center_y), int(center_z))
         
-        # Skip if player hasn't moved to a new chunk
-        if center_chunk == self._last_player_chunk:
-            return
-        
+        # Track last chunk for optimization, but still check for new chunks needed
+        chunk_changed = center_chunk != self._last_player_chunk
         self._last_player_chunk = center_chunk
         
         # Determine which chunks should be loaded
@@ -192,7 +195,14 @@ class World(Entity):
                     )
                     chunks_to_load.add(chunk_pos)
         
-        # Unload chunks that are too far
+        # Only do work if chunk changed (optimization)
+        if not chunk_changed and len(self.chunks) > 0:
+            # Quick check if all needed chunks are loaded
+            all_loaded = all(pos in self.chunks for pos in chunks_to_load)
+            if all_loaded and not self._chunk_load_queue:
+                return
+        
+        # Unload chunks that are too far (do this immediately)
         chunks_to_unload = []
         for pos in self.chunks:
             if pos not in chunks_to_load:
@@ -202,10 +212,26 @@ class World(Entity):
             chunk = self.chunks.pop(pos)
             destroy(chunk)
         
-        # Load new chunks
+        # Queue chunks that need to be loaded
         for pos in chunks_to_load:
-            if pos not in self.chunks:
-                self.chunks[pos] = self.generate_chunk(pos)
+            if pos not in self.chunks and pos not in self._chunk_load_queue:
+                self._chunk_load_queue.append(pos)
+        
+        # First load is synchronous (load all chunks at once to prevent falling through ground)
+        if not self._initial_load_complete:
+            while self._chunk_load_queue:
+                pos = self._chunk_load_queue.pop(0)
+                if pos not in self.chunks:
+                    self.chunks[pos] = self.generate_chunk(pos)
+            self._initial_load_complete = True
+        else:
+            # Gradual loading for exploration (prevents frame stutter)
+            chunks_loaded = 0
+            while self._chunk_load_queue and chunks_loaded < self._chunks_per_frame:
+                pos = self._chunk_load_queue.pop(0)
+                if pos not in self.chunks:
+                    self.chunks[pos] = self.generate_chunk(pos)
+                    chunks_loaded += 1
     
     def update_frustum_culling(self) -> None:
         """
