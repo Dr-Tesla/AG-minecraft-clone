@@ -231,6 +231,10 @@ class Player(Entity):
     
     def _handle_block_interaction(self):
         """Handle left-click (remove) and right-click (place) block."""
+        # Don't interact with blocks while paused (mouse unlocked)
+        if not mouse.locked:
+            return
+        
         if self._click_cooldown > 0:
             return
         

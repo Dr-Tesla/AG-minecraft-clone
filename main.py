@@ -78,84 +78,259 @@ def main():
         text='PAUSED',
         parent=camera.ui,
         origin=(0, 0),
-        y=0.2,
+        y=0.25,
+        z=-1,
         scale=2,
         color=color.white,
         enabled=False
     )
     
+    # State tracking
+    game_paused = [False]
+    current_tab = ['main']  # 'main' or 'settings'
+    
+    # Settings values
+    settings = {
+        'fov': 90,
+        'speed': 5.0
+    }
+    camera.fov = settings['fov']
+    
+    # ===== MAIN TAB ELEMENTS =====
     def quit_game():
         application.quit()
     
     quit_button = Button(
         text='Quit Game',
         parent=camera.ui,
-        scale=(0.25, 0.08),
-        y=0,
+        scale=(0.3, 0.08),
+        y=-0.1,
+        z=-1,
         color=color.red,
         highlight_color=color.orange,
         enabled=False,
         on_click=quit_game
     )
     
-    resume_button = Button(
-        text='Resume (Click)',
+    # Forward declarations for tab switching
+    main_tab_elements = []
+    settings_tab_elements = []
+    
+    def show_main_tab():
+        current_tab[0] = 'main'
+        for elem in main_tab_elements:
+            elem.enabled = True
+        for elem in settings_tab_elements:
+            elem.enabled = False
+    
+    def show_settings_tab():
+        current_tab[0] = 'settings'
+        for elem in main_tab_elements:
+            elem.enabled = False
+        for elem in settings_tab_elements:
+            elem.enabled = True
+    
+    settings_button = Button(
+        text='Settings',
         parent=camera.ui,
-        scale=(0.25, 0.08),
-        y=0.12,
-        color=color.azure,
-        highlight_color=color.cyan,
+        scale=(0.3, 0.08),
+        y=0.0,
+        z=-1,
+        color=color.gray,
+        highlight_color=color.white,
+        enabled=False,
+        on_click=show_settings_tab
+    )
+    
+    # ===== SETTINGS TAB ELEMENTS =====
+    settings_title = Text(
+        text='SETTINGS',
+        parent=camera.ui,
+        origin=(0, 0),
+        y=0.15,
+        z=-1,
+        scale=1.5,
+        color=color.yellow,
         enabled=False
     )
+    
+    # FOV Controls
+    fov_label = Text(
+        text=f"FOV: {settings['fov']}",
+        parent=camera.ui,
+        origin=(0, 0),
+        y=0.05,
+        z=-1,
+        scale=1,
+        color=color.white,
+        enabled=False
+    )
+    
+    def decrease_fov():
+        settings['fov'] = max(30, settings['fov'] - 10)
+        camera.fov = settings['fov']
+        fov_label.text = f"FOV: {settings['fov']}"
+    
+    def increase_fov():
+        settings['fov'] = min(120, settings['fov'] + 10)
+        camera.fov = settings['fov']
+        fov_label.text = f"FOV: {settings['fov']}"
+    
+    fov_minus_btn = Button(
+        text='-',
+        parent=camera.ui,
+        scale=(0.08, 0.06),
+        x=-0.18,
+        y=0.05,
+        z=-1,
+        color=color.gray,
+        highlight_color=color.white,
+        enabled=False,
+        on_click=decrease_fov
+    )
+    
+    fov_plus_btn = Button(
+        text='+',
+        parent=camera.ui,
+        scale=(0.08, 0.06),
+        x=0.18,
+        y=0.05,
+        z=-1,
+        color=color.gray,
+        highlight_color=color.white,
+        enabled=False,
+        on_click=increase_fov
+    )
+    
+    # Speed Controls
+    speed_label = Text(
+        text=f"Speed: {settings['speed']:.1f}",
+        parent=camera.ui,
+        origin=(0, 0),
+        y=-0.05,
+        z=-1,
+        scale=1,
+        color=color.white,
+        enabled=False
+    )
+    
+    def decrease_speed():
+        settings['speed'] = max(1.0, settings['speed'] - 1.0)
+        player.speed = settings['speed']
+        speed_label.text = f"Speed: {settings['speed']:.1f}"
+    
+    def increase_speed():
+        settings['speed'] = min(20.0, settings['speed'] + 1.0)
+        player.speed = settings['speed']
+        speed_label.text = f"Speed: {settings['speed']:.1f}"
+    
+    speed_minus_btn = Button(
+        text='-',
+        parent=camera.ui,
+        scale=(0.08, 0.06),
+        x=-0.18,
+        y=-0.05,
+        z=-1,
+        color=color.gray,
+        highlight_color=color.white,
+        enabled=False,
+        on_click=decrease_speed
+    )
+    
+    speed_plus_btn = Button(
+        text='+',
+        parent=camera.ui,
+        scale=(0.08, 0.06),
+        x=0.18,
+        y=-0.05,
+        z=-1,
+        color=color.gray,
+        highlight_color=color.white,
+        enabled=False,
+        on_click=increase_speed
+    )
+    
+    back_button = Button(
+        text='Back',
+        parent=camera.ui,
+        scale=(0.2, 0.07),
+        y=-0.18,
+        z=-1,
+        color=color.azure,
+        highlight_color=color.cyan,
+        enabled=False,
+        on_click=show_main_tab
+    )
+    
+    # Define hide_pause_menu first (needed by resume_game)
+    def hide_pause_menu():
+        pause_overlay.enabled = False
+        pause_text.enabled = False
+        for elem in main_tab_elements:
+            elem.enabled = False
+        for elem in settings_tab_elements:
+            elem.enabled = False
+    
+    def resume_game():
+        mouse.locked = True
+        mouse.visible = False
+        hide_pause_menu()
+        game_paused[0] = False
+        current_tab[0] = 'main'
+        # Set cooldown to prevent the resume click from breaking a block
+        player._click_cooldown = 0.25
+    
+    resume_button = Button(
+        text='Resume',
+        parent=camera.ui,
+        scale=(0.3, 0.08),
+        y=0.1,
+        z=-1,
+        color=color.azure,
+        highlight_color=color.cyan,
+        enabled=False,
+        on_click=resume_game
+    )
+    
+    # Populate tab element lists (now that all buttons are defined)
+    main_tab_elements.extend([resume_button, settings_button, quit_button])
+    settings_tab_elements.extend([
+        settings_title, fov_label, fov_minus_btn, fov_plus_btn,
+        speed_label, speed_minus_btn, speed_plus_btn, back_button
+    ])
     
     def show_pause_menu():
         pause_overlay.enabled = True
         pause_text.enabled = True
-        quit_button.enabled = True
-        resume_button.enabled = True
+        current_tab[0] = 'main'
+        show_main_tab()
     
-    def hide_pause_menu():
-        pause_overlay.enabled = False
-        pause_text.enabled = False
-        quit_button.enabled = False
-        resume_button.enabled = False
+    # Create an input handler entity for proper key detection
+    class InputHandler(Entity):
+        def input(self, key):
+            if key == 'q':
+                application.quit()
+            
+            if key == 'escape':
+                if mouse.locked:
+                    # Pause the game
+                    mouse.locked = False
+                    mouse.visible = True
+                    show_pause_menu()
+                    game_paused[0] = True
+                else:
+                    # Resume the game
+                    resume_game()
     
-    # Escape key cooldown to prevent rapid toggling
-    escape_cooldown = [0]
+    input_handler = InputHandler()
     
     # Update function called every frame
     def update():
-        from ursina import time
-        
         # Update chunk loading based on player position
         world.load_chunks_around(player.position.x, player.position.y, player.position.z)
         
         # Update frustum culling
         world.update_frustum_culling()
-        
-        # Update escape cooldown
-        if escape_cooldown[0] > 0:
-            escape_cooldown[0] -= time.dt
-        
-        # Q key to quit directly
-        if held_keys['q']:
-            application.quit()
-        
-        # Handle escape key to toggle pause menu
-        if held_keys['escape'] and escape_cooldown[0] <= 0:
-            escape_cooldown[0] = 0.3  # Cooldown to prevent rapid toggling
-            if mouse.locked:
-                mouse.locked = False
-                mouse.visible = True
-                show_pause_menu()
-            else:
-                application.quit()
-        
-        # Re-lock mouse on resume button click or right-click
-        if not mouse.locked and (held_keys['right mouse'] or (resume_button.enabled and resume_button.hovered and held_keys['left mouse'])):
-            mouse.locked = True
-            mouse.visible = False
-            hide_pause_menu()
     
     # Assign update function
     app.update = update
