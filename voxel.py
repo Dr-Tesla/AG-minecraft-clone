@@ -4,13 +4,13 @@ voxel.py - Block Type Definitions and Texture UV Mappings
 This module defines the different block types in the game and their
 corresponding texture coordinates in the texture atlas.
 
-Texture Atlas Layout (48x16 pixels):
-    [Grass Top][Grass Side][Dirt][Stone]
+Texture Atlas Layout (144x16 pixels):
+    [Grass Top][Grass Side][Dirt][Stone][Wood][Sand][Cobblestone][Planks][Leaves]
     Each texture is 16x16 pixels
     
 UV Coordinates:
     UV coords range from 0-1 across the entire atlas
-    Each block texture occupies 1/4 of the atlas width (0.25)
+    Each block texture occupies 1/9 of the atlas width (~0.111)
 """
 
 from enum import IntEnum
@@ -26,6 +26,11 @@ class BlockType(IntEnum):
     GRASS = 1
     DIRT = 2
     STONE = 3
+    WOOD = 4
+    SAND = 5
+    COBBLESTONE = 6
+    PLANKS = 7
+    LEAVES = 8
 
 class Face(IntEnum):
     """
@@ -52,7 +57,7 @@ FACE_DIRECTIONS: List[Tuple[int, int, int]] = [
 
 # Texture atlas UV coordinates
 # Format: (u_min, v_min, u_max, v_max) for each texture slot
-ATLAS_WIDTH = 4  # 4 textures in atlas
+ATLAS_WIDTH = 9  # 9 textures in atlas
 
 def get_uv_offset(texture_index: int) -> Tuple[float, float]:
     """
@@ -93,6 +98,46 @@ BLOCK_TEXTURES: Dict[BlockType, Dict[Face, int]] = {
         Face.BACK: 3,
         Face.LEFT: 3,
         Face.RIGHT: 3,
+    },
+    BlockType.WOOD: {
+        Face.TOP: 4,
+        Face.BOTTOM: 4,
+        Face.FRONT: 4,
+        Face.BACK: 4,
+        Face.LEFT: 4,
+        Face.RIGHT: 4,
+    },
+    BlockType.SAND: {
+        Face.TOP: 5,
+        Face.BOTTOM: 5,
+        Face.FRONT: 5,
+        Face.BACK: 5,
+        Face.LEFT: 5,
+        Face.RIGHT: 5,
+    },
+    BlockType.COBBLESTONE: {
+        Face.TOP: 6,
+        Face.BOTTOM: 6,
+        Face.FRONT: 6,
+        Face.BACK: 6,
+        Face.LEFT: 6,
+        Face.RIGHT: 6,
+    },
+    BlockType.PLANKS: {
+        Face.TOP: 7,
+        Face.BOTTOM: 7,
+        Face.FRONT: 7,
+        Face.BACK: 7,
+        Face.LEFT: 7,
+        Face.RIGHT: 7,
+    },
+    BlockType.LEAVES: {
+        Face.TOP: 8,
+        Face.BOTTOM: 8,
+        Face.FRONT: 8,
+        Face.BACK: 8,
+        Face.LEFT: 8,
+        Face.RIGHT: 8,
     },
 }
 

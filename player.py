@@ -31,10 +31,11 @@ class Player(Entity):
     First-person player controller with collision and block interaction.
     """
     
-    def __init__(self, world: World, **kwargs):
+    def __init__(self, world: World, hotbar=None, **kwargs):
         super().__init__(**kwargs)
         
         self.world = world
+        self.hotbar = hotbar
         
         # Movement settings
         self.speed = 5.0
@@ -324,7 +325,9 @@ class Player(Entity):
                 ]
                 
                 if place_pos not in player_blocks:
-                    self.world.set_block(*place_pos, BlockType.DIRT)
+                    # Use selected block from hotbar, or DIRT as fallback
+                    block_type = self.hotbar.get_selected_block() if self.hotbar else BlockType.DIRT
+                    self.world.set_block(*place_pos, block_type)
                     self._click_cooldown = 0.25
     
     def on_disable(self):

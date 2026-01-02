@@ -18,6 +18,7 @@ from ursina import camera
 
 from world import World
 from player import Player
+from hotbar import Hotbar
 
 
 def main():
@@ -44,14 +45,15 @@ def main():
     
     # Create player at a reasonable starting position
     # Start above the terrain so they fall to the ground
-    player = Player(world, position=(8, 50, 8))
+    hotbar = Hotbar()
+    player = Player(world, hotbar=hotbar, position=(8, 50, 8))
     
     # Initial chunk loading around player
     world.load_chunks_around(player.position.x, player.position.y, player.position.z)
     
     # Instructions text (fades after a few seconds)
     instructions = Text(
-        text='WASD: Move | Mouse: Look | Space: Jump | Left Click: Break | Right Click: Place | Q: Quit | ESC: Pause',
+        text='WASD: Move | Space: Jump | 1-8: Select Block | Left/Right Click: Break/Place | ESC: Pause',
         origin=(0, 0),
         y=0.45,
         scale=0.8,
