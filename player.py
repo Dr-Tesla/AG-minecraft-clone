@@ -86,6 +86,24 @@ class Player(Entity):
         # Block interaction cooldown
         self._click_cooldown = 0.0
         self._stuck_cooldown = 0.0  # Prevents bouncing when stuck
+        
+        # Block breaking state
+        self._breaking_block = None  # (x, y, z) of block being broken
+        self._breaking_progress = 0.0  # 0.0 to 1.0
+        self._break_time = 0.5  # Time to break a block (seconds)
+        self._crack_stages = 4  # Number of crack texture stages
+        
+        # Crack overlay entity for breaking animation (textured cube)
+        self._crack_overlay = Entity(
+            model='cube',
+            texture='assets/crack_atlas.png',
+            color=color.white,
+            scale=1.02,  # Slightly larger than block
+            enabled=False,
+            double_sided=True
+        )
+        # Set initial texture offset
+        self._crack_overlay.texture_scale = (1/self._crack_stages, 1)
     
     def update(self):
         """Called every frame - handles input and physics."""
@@ -295,25 +313,46 @@ class Player(Entity):
         """Handle left-click (remove) and right-click (place) block."""
         # Don't interact with blocks while paused (mouse unlocked)
         if not mouse.locked:
-            return
-        
-        if self._click_cooldown > 0:
+            self._reset_breaking()
             return
         
         # Get camera forward direction for raycasting
         cam_forward = camera.forward
         cam_pos = camera.world_position
         
-        # Left click - remove block
+        # Left click - break block (with progress)
         if held_keys['left mouse'] or mouse.left:
             result = self.world.raycast_block(cam_pos, cam_forward, max_distance=6.0)
             if result:
                 hit_pos, _ = result
-                self.world.set_block(*hit_pos, BlockType.AIR)
-                self._click_cooldown = 0.25
+                
+                # Check if we're breaking the same block
+                if self._breaking_block == hit_pos:
+                    # Continue breaking
+                    self._breaking_progress += time.dt / self._break_time
+                    self._update_crack_overlay(hit_pos)
+                    
+                    # Check if block is fully broken
+                    if self._breaking_progress >= 1.0:
+                        self.world.set_block(*hit_pos, BlockType.AIR)
+                        self._reset_breaking()
+                        self._click_cooldown = 0.15
+                else:
+                    # Started breaking a new block
+                    self._breaking_block = hit_pos
+                    self._breaking_progress = 0.0
+                    self._update_crack_overlay(hit_pos)
+            else:
+                self._reset_breaking()
+        else:
+            # Not holding left click
+            self._reset_breaking()
         
         # Right click - place block
-        elif held_keys['right mouse'] or mouse.right:
+        if self._click_cooldown > 0:
+            return
+            
+        if held_keys['right mouse'] or mouse.right:
             result = self.world.raycast_block(cam_pos, cam_forward, max_distance=6.0)
             if result:
                 _, place_pos = result
@@ -329,6 +368,26 @@ class Player(Entity):
                     block_type = self.hotbar.get_selected_block() if self.hotbar else BlockType.DIRT
                     self.world.set_block(*place_pos, block_type)
                     self._click_cooldown = 0.25
+    
+    def _reset_breaking(self):
+        """Reset block breaking state."""
+        self._breaking_block = None
+        self._breaking_progress = 0.0
+        self._crack_overlay.enabled = False
+    
+    def _update_crack_overlay(self, block_pos):
+        """Update the crack overlay position and appearance."""
+        self._crack_overlay.enabled = True
+        self._crack_overlay.position = Vec3(
+            block_pos[0] + 0.5,
+            block_pos[1] + 0.5,
+            block_pos[2] + 0.5
+        )
+        
+        # Select crack stage based on progress (0-3)
+        stage = min(int(self._breaking_progress * self._crack_stages), self._crack_stages - 1)
+        u_offset = stage / self._crack_stages
+        self._crack_overlay.texture_offset = (u_offset, 0)
     
     def on_disable(self):
         """Called when player is disabled - unlock mouse."""
