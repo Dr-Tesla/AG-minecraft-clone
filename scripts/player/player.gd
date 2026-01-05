@@ -21,14 +21,29 @@ var block_interaction: Node = null
 # Current movement state
 var current_speed: float = 5.0
 
+# Whether physics is frozen (waiting for world to load)
+var is_frozen: bool = true
+
 func _ready() -> void:
 	# Camera is a child node
 	camera = $PlayerCamera as PlayerCamera
 	
 	# Block interaction component
 	block_interaction = $BlockInteraction
+	
+	# Configure floor detection for voxel terrain
+	floor_snap_length = 0.5  # Snap to floor within 0.5 units
+	floor_max_angle = deg_to_rad(60)  # Allow 60 degree slopes as floor
+
+# Freeze or unfreeze player physics
+func set_frozen(frozen: bool) -> void:
+	is_frozen = frozen
 
 func _physics_process(delta: float) -> void:
+	# Don't process physics while frozen
+	if is_frozen:
+		return
+	
 	_apply_gravity(delta)
 	_handle_jump()
 	_handle_movement()
@@ -51,11 +66,16 @@ func _handle_movement() -> void:
 	input_dir.x = Input.get_axis("move_left", "move_right")
 	input_dir.y = Input.get_axis("move_forward", "move_backward")
 	
-	# Convert to 3D direction relative to player rotation
+	# Convert to 3D direction relative to camera's horizontal facing
 	var direction := Vector3.ZERO
-	direction += transform.basis.x * input_dir.x
-	direction += -transform.basis.z * input_dir.y
-	direction = direction.normalized()
+	if camera and input_dir != Vector2.ZERO:
+		# Get camera's forward direction (ignoring pitch)
+		var cam_basis := camera.global_transform.basis
+		var forward := -Vector3(cam_basis.z.x, 0, cam_basis.z.z).normalized()
+		var right := Vector3(cam_basis.x.x, 0, cam_basis.x.z).normalized()
+		
+		direction = right * input_dir.x + forward * (-input_dir.y)
+		direction = direction.normalized()
 	
 	# Apply movement
 	if direction != Vector3.ZERO:

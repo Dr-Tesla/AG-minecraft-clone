@@ -17,6 +17,7 @@ extends Node3D
 
 signal chunk_loaded(chunk_pos: Vector3i)
 signal chunk_unloaded(chunk_pos: Vector3i)
+signal initial_chunks_ready
 
 # Configuration
 @export var render_distance: int = 4  # Chunks in each direction
@@ -35,9 +36,29 @@ var player: Node3D = null
 var load_queue: Array[Vector3i] = []
 var chunks_per_frame: int = 2  # Max chunks to process per frame
 
+# Initialization state
+var is_initialized: bool = false
+
 func _ready() -> void:
 	# Material will be set by main.gd
 	pass
+
+# Generate initial chunks synchronously around a spawn position
+# This ensures the player has ground to stand on before spawning
+func generate_initial_chunks(spawn_pos: Vector3) -> void:
+	var spawn_chunk := Chunk.world_to_chunk(Vector3i(spawn_pos))
+	var initial_radius := 2  # Smaller radius for faster initial load
+	
+	# Generate chunks in a small radius around spawn
+	for x in range(-initial_radius, initial_radius + 1):
+		for y in range(-2, 2):  # Vertical range
+			for z in range(-initial_radius, initial_radius + 1):
+				var chunk_pos := spawn_chunk + Vector3i(x, y, z)
+				if not chunks.has(chunk_pos):
+					_load_chunk(chunk_pos)
+	
+	is_initialized = true
+	emit_signal("initial_chunks_ready")
 
 func _process(_delta: float) -> void:
 	if player == null:

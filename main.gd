@@ -23,10 +23,19 @@ var block_material: StandardMaterial3D = null
 func _ready() -> void:
 	_setup_material()
 	_setup_world()
+	_generate_spawn_chunks()
 	_spawn_player()
 	
 	# Show FPS in title for debugging
 	_setup_debug()
+
+# Generate chunks around spawn before player is active
+func _generate_spawn_chunks() -> void:
+	var spawn_height := world_generator.get_spawn_height(0, 0)
+	var spawn_pos := Vector3(8, spawn_height + 5, 8)
+	
+	# Generate initial chunks synchronously
+	chunk_manager.generate_initial_chunks(spawn_pos)
 
 # Create the material with texture atlas
 func _setup_material() -> void:
@@ -136,6 +145,9 @@ func _spawn_player() -> void:
 	var block_interaction := player.get_node("BlockInteraction") as BlockInteraction
 	if block_interaction:
 		block_interaction.set_chunk_manager(chunk_manager)
+	
+	# Unfreeze player now that chunks are loaded
+	player.set_frozen(false)
 
 # Debug display
 func _setup_debug() -> void:

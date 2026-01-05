@@ -34,16 +34,20 @@ var chunk_manager: Node = null
 
 # Mesh components
 var mesh_instance: MeshInstance3D = null
-var collision_shape: CollisionShape3D = null
 var static_body: StaticBody3D = null
 
 # Flag to track if mesh needs rebuilding
 var is_dirty: bool = true
 
-func _ready() -> void:
+func _init() -> void:
+	# Initialize immediately in constructor (before _ready)
 	_initialize_blocks()
 	_setup_mesh_instance()
 	_setup_collision()
+
+func _ready() -> void:
+	# Everything is already initialized in _init()
+	pass
 
 # Initialize the 3D block array with AIR
 func _initialize_blocks() -> void:
@@ -66,8 +70,9 @@ func _setup_mesh_instance() -> void:
 # Setup collision detection
 func _setup_collision() -> void:
 	static_body = StaticBody3D.new()
-	collision_shape = CollisionShape3D.new()
-	static_body.add_child(collision_shape)
+	# Explicitly set collision layer (layer 1 = terrain)
+	static_body.collision_layer = 1
+	static_body.collision_mask = 1
 	add_child(static_body)
 
 # ==============================================================================
@@ -137,6 +142,14 @@ func rebuild_mesh(material: Material) -> void:
 	
 	var vertex_count := 0
 	
+	# Clear existing collision shapes
+	for child in static_body.get_children():
+		child.queue_free()
+	
+	# Shared box shape for all block collisions (1x1x1 cube)
+	var box_shape := BoxShape3D.new()
+	box_shape.size = Vector3(1, 1, 1)
+	
 	# Iterate through all blocks in the chunk
 	for x in CHUNK_SIZE:
 		for y in CHUNK_SIZE:
@@ -146,6 +159,12 @@ func rebuild_mesh(material: Material) -> void:
 				# Skip air blocks - nothing to render
 				if not Block.is_solid(block_type):
 					continue
+				
+				# Add collision box for this block
+				var col_shape := CollisionShape3D.new()
+				col_shape.shape = box_shape
+				col_shape.position = Vector3(x + 0.5, y + 0.5, z + 0.5)
+				static_body.add_child(col_shape)
 				
 				# Check each face and only add if neighbor is air/transparent
 				vertex_count = _add_visible_faces(
@@ -161,10 +180,6 @@ func rebuild_mesh(material: Material) -> void:
 	var mesh := surface_tool.commit()
 	mesh_instance.mesh = mesh
 	mesh_instance.material_override = material
-	
-	# Update collision shape
-	if mesh.get_surface_count() > 0:
-		collision_shape.shape = mesh.create_trimesh_shape()
 	
 	is_dirty = false
 
