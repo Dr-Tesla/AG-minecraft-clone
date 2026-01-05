@@ -134,6 +134,24 @@ func _load_chunk(chunk_pos: Vector3i) -> void:
 	
 	emit_signal("chunk_loaded", chunk_pos)
 
+# Rebuild all 6 adjacent chunks when a new chunk loads
+func _rebuild_adjacent_chunks(chunk_pos: Vector3i) -> void:
+	# Use call_deferred to avoid blocking during initial chunk generation
+	call_deferred("_do_rebuild_adjacent_chunks", chunk_pos)
+
+func _do_rebuild_adjacent_chunks(chunk_pos: Vector3i) -> void:
+	var neighbors: Array[Vector3i] = [
+		Vector3i(1, 0, 0), Vector3i(-1, 0, 0),
+		Vector3i(0, 1, 0), Vector3i(0, -1, 0),
+		Vector3i(0, 0, 1), Vector3i(0, 0, -1)
+	]
+	for offset: Vector3i in neighbors:
+		var neighbor_pos: Vector3i = chunk_pos + offset
+		if chunks.has(neighbor_pos):
+			var neighbor_chunk: Chunk = chunks[neighbor_pos]
+			neighbor_chunk.is_dirty = true
+			neighbor_chunk.rebuild_mesh(chunk_material)
+
 # Unload a chunk
 func _unload_chunk(chunk_pos: Vector3i) -> void:
 	if not chunks.has(chunk_pos):

@@ -43,16 +43,23 @@ func _setup_material() -> void:
 	
 	# Load or create texture atlas
 	var atlas_path := "res://textures/atlas.png"
+	var texture = null
+	
 	if ResourceLoader.exists(atlas_path):
-		block_material.albedo_texture = load(atlas_path)
-	else:
-		# Create procedural texture if atlas doesn't exist
-		block_material.albedo_texture = _create_procedural_atlas()
+		texture = load(atlas_path)
+	
+	# Fall back to procedural atlas if loading failed
+	if texture == null:
+		print("Texture atlas not found or invalid, generating procedural texture")
+		texture = _create_procedural_atlas()
+	
+	block_material.albedo_texture = texture
 	
 	# Material settings for voxel rendering
 	block_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	block_material.roughness = 1.0
 	block_material.metallic = 0.0
+	block_material.cull_mode = BaseMaterial3D.CULL_DISABLED  # Show both sides of faces
 
 # Create a procedural texture atlas (for testing without external textures)
 func _create_procedural_atlas() -> ImageTexture:

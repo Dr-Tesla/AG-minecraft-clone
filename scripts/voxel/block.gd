@@ -118,8 +118,8 @@ const QUAD_UVS: Array[Vector2] = [
 	Vector2(0, 1), Vector2(1, 1), Vector2(1, 0), Vector2(0, 0)
 ]
 
-# Triangle indices for a quad (two triangles)
-const QUAD_INDICES: Array[int] = [0, 1, 2, 0, 2, 3]
+# Triangle indices for a quad (two triangles) - reversed for correct outward normals
+const QUAD_INDICES: Array[int] = [0, 2, 1, 0, 3, 2]
 
 # Normal vectors for each face
 const FACE_NORMALS: Dictionary = {
