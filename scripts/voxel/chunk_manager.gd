@@ -36,6 +36,9 @@ var player: Node3D = null
 var load_queue: Array[Vector3i] = []
 var chunks_per_frame: int = 2  # Max chunks to process per frame
 
+# Dirty chunks queue - chunks that need mesh rebuild (for boundary updates)
+var dirty_chunks: Dictionary = {}  # Vector3i -> true
+
 # Initialization state
 var is_initialized: bool = false
 
@@ -66,7 +69,22 @@ func _process(_delta: float) -> void:
 	
 	_update_loaded_chunks()
 	_process_load_queue()
+	_process_dirty_chunks()
 	_update_frustum_culling()
+
+# Process dirty chunks (rebuild meshes for boundary updates)
+func _process_dirty_chunks() -> void:
+	if dirty_chunks.is_empty():
+		return
+	
+	# Process only 1 dirty chunk per frame to avoid stuttering
+	var chunk_pos: Vector3i = dirty_chunks.keys()[0]
+	dirty_chunks.erase(chunk_pos)
+	
+	if chunks.has(chunk_pos):
+		var chunk: Chunk = chunks[chunk_pos]
+		chunk.is_dirty = true
+		chunk.rebuild_mesh(chunk_material)
 
 # ==============================================================================
 # CHUNK LOADING/UNLOADING
@@ -132,25 +150,22 @@ func _load_chunk(chunk_pos: Vector3i) -> void:
 	# Build the mesh
 	chunk.rebuild_mesh(chunk_material)
 	
+	# Mark adjacent chunks as dirty (they'll rebuild in _process_dirty_chunks)
+	_mark_neighbors_dirty(chunk_pos)
+	
 	emit_signal("chunk_loaded", chunk_pos)
 
-# Rebuild all 6 adjacent chunks when a new chunk loads
-func _rebuild_adjacent_chunks(chunk_pos: Vector3i) -> void:
-	# Use call_deferred to avoid blocking during initial chunk generation
-	call_deferred("_do_rebuild_adjacent_chunks", chunk_pos)
-
-func _do_rebuild_adjacent_chunks(chunk_pos: Vector3i) -> void:
-	var neighbors: Array[Vector3i] = [
+# Mark all 6 adjacent chunks as needing rebuild
+func _mark_neighbors_dirty(chunk_pos: Vector3i) -> void:
+	var offsets: Array[Vector3i] = [
 		Vector3i(1, 0, 0), Vector3i(-1, 0, 0),
 		Vector3i(0, 1, 0), Vector3i(0, -1, 0),
 		Vector3i(0, 0, 1), Vector3i(0, 0, -1)
 	]
-	for offset: Vector3i in neighbors:
+	for offset: Vector3i in offsets:
 		var neighbor_pos: Vector3i = chunk_pos + offset
 		if chunks.has(neighbor_pos):
-			var neighbor_chunk: Chunk = chunks[neighbor_pos]
-			neighbor_chunk.is_dirty = true
-			neighbor_chunk.rebuild_mesh(chunk_material)
+			dirty_chunks[neighbor_pos] = true
 
 # Unload a chunk
 func _unload_chunk(chunk_pos: Vector3i) -> void:
@@ -178,19 +193,13 @@ func _update_frustum_culling() -> void:
 
 # Check if a chunk's AABB is within the camera's view frustum
 func _is_chunk_in_frustum(camera: Camera3D, chunk: Chunk) -> bool:
-	var aabb := chunk.get_world_aabb()
-	
-	# Quick check: is the center visible?
-	if camera.is_position_in_frustum(aabb.get_center()):
-		return true
-	
-	# Check all 8 corners of the AABB
-	var corners := _get_aabb_corners(aabb)
-	for corner in corners:
-		if camera.is_position_in_frustum(corner):
-			return true
-	
-	return false
+	# TODO: Implement proper frustum culling for performance optimization
+	# The old implementation was hiding visible chunks when:
+	# - Player is inside or very close to a chunk
+	# - Looking at certain angles where corners are outside frustum but faces are visible
+	# Consider using frustum planes directly or checking if camera is inside chunk AABB
+	# For now, all loaded chunks are always visible (Godot handles rendering efficiently)
+	return true
 
 # Get the 8 corners of an AABB
 func _get_aabb_corners(aabb: AABB) -> Array[Vector3]:
