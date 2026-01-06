@@ -5,6 +5,7 @@
 # - World Generator for procedural terrain
 # - Chunk Manager for voxel rendering
 # - Player spawning and camera setup
+# - Day/Night cycle with lighting
 # ==============================================================================
 
 extends Node3D
@@ -16,15 +17,25 @@ extends Node3D
 
 # World configuration
 @export var world_seed: int = 12345
+@export_range(6, 24) var starting_hour: int = 6  # 6 = 6am, 12 = noon, 18 = 6pm
 
 # Block material with texture atlas
 var block_material: StandardMaterial3D = null
 
+# Day/night cycle components
+var day_night_cycle: DayNightCycle = null
+var sun_light: DirectionalLight3D = null
+var world_environment: WorldEnvironment = null
+var time_widget: TimeWidget = null
+
 func _ready() -> void:
+	_setup_lighting()
 	_setup_material()
 	_setup_world()
+	_setup_day_night_cycle()
 	_generate_spawn_chunks()
 	_spawn_player()
+	_setup_ui()
 	
 	# Show FPS in title for debugging
 	_setup_debug()
@@ -138,6 +149,55 @@ func _setup_world() -> void:
 	# Connect chunk manager to world generator
 	chunk_manager.world_generator = world_generator
 	chunk_manager.chunk_material = block_material
+
+# Setup DirectionalLight3D for sun and WorldEnvironment
+func _setup_lighting() -> void:
+	# Create sun light
+	sun_light = DirectionalLight3D.new()
+	sun_light.name = "SunLight"
+	sun_light.light_energy = 1.0
+	sun_light.light_color = Color(1.0, 1.0, 0.9)
+	sun_light.shadow_enabled = true
+	sun_light.rotation_degrees = Vector3(-45, 45, 0)
+	add_child(sun_light)
+	
+	# Find existing WorldEnvironment from scene (don't create new one)
+	world_environment = $WorldEnvironment as WorldEnvironment
+	
+	# If found, ensure it's using BG_COLOR mode for dynamic color changes
+	if world_environment and world_environment.environment:
+		var env := world_environment.environment
+		# Switch from Sky to Color mode for easier color updates
+		env.background_mode = Environment.BG_COLOR
+		env.background_color = Color(0.4, 0.7, 1.0)  # Start with sky blue
+		print("Using existing WorldEnvironment, switched to BG_COLOR mode")
+
+# Setup day/night cycle
+func _setup_day_night_cycle() -> void:
+	day_night_cycle = DayNightCycle.new()
+	day_night_cycle.name = "DayNightCycle"
+	day_night_cycle.starting_hour = starting_hour  # Use export variable
+	add_child(day_night_cycle)
+	
+	# Connect to lighting - pass WorldEnvironment directly
+	if world_environment:
+		day_night_cycle.setup(sun_light, world_environment)
+
+# Setup UI elements
+func _setup_ui() -> void:
+	# Create CanvasLayer for UI
+	var canvas := CanvasLayer.new()
+	canvas.name = "UI"
+	add_child(canvas)
+	
+	# Create time widget
+	time_widget = TimeWidget.new()
+	time_widget.name = "TimeWidget"
+	canvas.add_child(time_widget)
+	
+	# Connect to day/night cycle
+	if day_night_cycle:
+		time_widget.setup(day_night_cycle)
 
 # Spawn player at world center
 func _spawn_player() -> void:

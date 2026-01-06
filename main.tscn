@@ -32,12 +32,14 @@ height = 1.8
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
+starting_hour = 18
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_main")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.866, -0.25, 0.433, 0, 0.866, 0.5, -0.5, -0.433, 0.75, 0, 50, 0)
+visible = false
 shadow_enabled = true
 shadow_bias = 0.05
 directional_shadow_mode = 1
