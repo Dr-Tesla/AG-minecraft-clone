@@ -40,6 +40,9 @@ var static_body: StaticBody3D = null
 # Flag to track if mesh needs rebuilding
 var is_dirty: bool = true
 
+# Track solid block count for early exit optimization
+var solid_block_count: int = 0
+
 func _init() -> void:
 	# Initialize immediately in constructor (before _ready)
 	_initialize_blocks()
@@ -92,6 +95,14 @@ func get_block(x: int, y: int, z: int) -> Block.Type:
 # Set block at local coordinates
 func set_block(x: int, y: int, z: int, block_type: Block.Type) -> void:
 	if _is_valid_local_position(x, y, z):
+		var old_type: Block.Type = blocks[x][y][z]
+		
+		# Update solid block count
+		if Block.is_solid(old_type) and not Block.is_solid(block_type):
+			solid_block_count -= 1
+		elif not Block.is_solid(old_type) and Block.is_solid(block_type):
+			solid_block_count += 1
+		
 		blocks[x][y][z] = block_type
 		is_dirty = true
 
@@ -140,10 +151,22 @@ func rebuild_mesh(material: Material) -> void:
 	if not is_dirty:
 		return
 	
+	# Early exit for chunks with no solid blocks
+	if solid_block_count == 0:
+		mesh_instance.mesh = null
+		if collision_shape:
+			collision_shape.shape = null
+		is_dirty = false
+		return
+	
 	var surface_tool := SurfaceTool.new()
 	surface_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
 	
 	var vertex_count := 0
+	
+	# Cache face data for faster access
+	var face_directions := Block.FACE_DIRECTIONS
+	var face_values := Block.Face.values()
 	
 	# Iterate through all blocks in the chunk
 	for x in CHUNK_SIZE:
@@ -163,18 +186,22 @@ func rebuild_mesh(material: Material) -> void:
 					vertex_count
 				)
 	
-	# Generate normals and create the mesh
-	surface_tool.generate_normals()
-	
+	# Normals are already set per-vertex in _add_face, no need to generate
 	var mesh := surface_tool.commit()
 	mesh_instance.mesh = mesh
 	mesh_instance.material_override = material
 	
-	# Update collision using trimesh (fast)
+	# Defer collision creation to avoid frame spike
+	# Create trimesh shape only if mesh has geometry
 	if mesh.get_surface_count() > 0:
-		collision_shape.shape = mesh.create_trimesh_shape()
+		call_deferred("_update_collision", mesh)
 	
 	is_dirty = false
+
+# Deferred collision update to spread work across frames
+func _update_collision(mesh: ArrayMesh) -> void:
+	if collision_shape:
+		collision_shape.shape = mesh.create_trimesh_shape()
 
 # Add only the visible faces of a block (face culling)
 func _add_visible_faces(
@@ -184,19 +211,34 @@ func _add_visible_faces(
 	vertex_offset: int
 ) -> int:
 	var offset := vertex_offset
+	var x := local_pos.x
+	var y := local_pos.y
+	var z := local_pos.z
 	
-	# Check each of the 6 faces
-	for face_idx in Block.Face.values():
-		var face: Block.Face = face_idx as Block.Face
-		var dir: Vector3i = Block.FACE_DIRECTIONS[face]
-		
-		# Get the neighboring block in this direction
-		var neighbor_pos := local_pos + dir
-		var neighbor_type := get_block(neighbor_pos.x, neighbor_pos.y, neighbor_pos.z)
-		
-		# Only render this face if the neighbor is transparent (e.g., AIR)
-		if Block.is_transparent(neighbor_type):
-			offset = _add_face(st, local_pos, block_type, face, offset)
+	# Inline check for each face - avoids function call overhead
+	# TOP face (+Y)
+	if y == CHUNK_SIZE - 1 or blocks[x][y + 1][z] == Block.Type.AIR:
+		offset = _add_face(st, local_pos, block_type, Block.Face.TOP, offset)
+	
+	# BOTTOM face (-Y)
+	if y == 0 or blocks[x][y - 1][z] == Block.Type.AIR:
+		offset = _add_face(st, local_pos, block_type, Block.Face.BOTTOM, offset)
+	
+	# FRONT face (+Z)
+	if z == CHUNK_SIZE - 1 or blocks[x][y][z + 1] == Block.Type.AIR:
+		offset = _add_face(st, local_pos, block_type, Block.Face.FRONT, offset)
+	
+	# BACK face (-Z)
+	if z == 0 or blocks[x][y][z - 1] == Block.Type.AIR:
+		offset = _add_face(st, local_pos, block_type, Block.Face.BACK, offset)
+	
+	# LEFT face (-X)
+	if x == 0 or blocks[x - 1][y][z] == Block.Type.AIR:
+		offset = _add_face(st, local_pos, block_type, Block.Face.LEFT, offset)
+	
+	# RIGHT face (+X)
+	if x == CHUNK_SIZE - 1 or blocks[x + 1][y][z] == Block.Type.AIR:
+		offset = _add_face(st, local_pos, block_type, Block.Face.RIGHT, offset)
 	
 	return offset
 

@@ -20,7 +20,7 @@ signal chunk_unloaded(chunk_pos: Vector3i)
 signal initial_chunks_ready
 
 # Configuration
-@export var render_distance: int = 4  # Chunks in each direction
+@export var render_distance: int = 3  # Reduced from 4 for better performance
 @export var chunk_material: Material = null
 
 # Active chunks dictionary: Vector3i -> Chunk
@@ -34,10 +34,15 @@ var player: Node3D = null
 
 # Chunk loading queue for async loading
 var load_queue: Array[Vector3i] = []
-var chunks_per_frame: int = 2  # Max chunks to process per frame
+var chunks_per_frame: int = 1  # Max chunks per frame
+var max_load_time_ms: float = 5.0  # Time budget in milliseconds per frame
+
+# Track if queue needs re-sorting (only sort when new chunks added)
+var queue_needs_sort: bool = false
 
 # Dirty chunks queue - chunks that need mesh rebuild (for boundary updates)
 var dirty_chunks: Dictionary = {}  # Vector3i -> true
+var dirty_chunks_per_frame: int = 1  # Limit dirty chunk rebuilds per frame
 
 # Initialization state
 var is_initialized: bool = false
@@ -68,8 +73,13 @@ func _process(_delta: float) -> void:
 		return
 	
 	_update_loaded_chunks()
-	_process_load_queue()
-	_process_dirty_chunks()
+	var chunks_loaded := _process_load_queue()
+	
+	# Only process dirty chunks if we didn't load any new chunks this frame
+	# This prevents stacking expensive operations
+	if chunks_loaded == 0:
+		_process_dirty_chunks()
+	
 	_update_frustum_culling()
 
 # Process dirty chunks (rebuild meshes for boundary updates)
@@ -77,14 +87,16 @@ func _process_dirty_chunks() -> void:
 	if dirty_chunks.is_empty():
 		return
 	
-	# Process only 1 dirty chunk per frame to avoid stuttering
-	var chunk_pos: Vector3i = dirty_chunks.keys()[0]
-	dirty_chunks.erase(chunk_pos)
-	
-	if chunks.has(chunk_pos):
-		var chunk: Chunk = chunks[chunk_pos]
-		chunk.is_dirty = true
-		chunk.rebuild_mesh(chunk_material)
+	var processed := 0
+	while not dirty_chunks.is_empty() and processed < dirty_chunks_per_frame:
+		var chunk_pos: Vector3i = dirty_chunks.keys()[0]
+		dirty_chunks.erase(chunk_pos)
+		
+		if chunks.has(chunk_pos):
+			var chunk: Chunk = chunks[chunk_pos]
+			chunk.is_dirty = true
+			chunk.rebuild_mesh(chunk_material)
+			processed += 1
 
 # ==============================================================================
 # CHUNK LOADING/UNLOADING
@@ -106,6 +118,12 @@ func _update_loaded_chunks() -> void:
 				# Queue for loading if not already loaded
 				if not chunks.has(chunk_pos) and not load_queue.has(chunk_pos):
 					load_queue.append(chunk_pos)
+					queue_needs_sort = true  # Mark for re-sort
+	
+	# Only sort if new chunks were added
+	if queue_needs_sort:
+		_sort_load_queue_by_distance(player_chunk)
+		queue_needs_sort = false
 	
 	# Unload chunks that are too far
 	var chunks_to_unload: Array[Vector3i] = []
@@ -116,11 +134,32 @@ func _update_loaded_chunks() -> void:
 	for chunk_pos in chunks_to_unload:
 		_unload_chunk(chunk_pos)
 
-# Process the chunk loading queue
-func _process_load_queue() -> void:
-	var loaded_count := 0
+# Sort load queue so closer chunks load first
+func _sort_load_queue_by_distance(player_chunk: Vector3i) -> void:
+	if load_queue.size() <= 1:
+		return
 	
-	while load_queue.size() > 0 and loaded_count < chunks_per_frame:
+	# Simple sort using distance squared
+	load_queue.sort_custom(func(a: Vector3i, b: Vector3i) -> bool:
+		var dist_a := (a - player_chunk).length_squared()
+		var dist_b := (b - player_chunk).length_squared()
+		return dist_a < dist_b
+	)
+
+# Process the chunk loading queue with time budget
+func _process_load_queue() -> int:
+	var loaded_count := 0
+	var start_time := Time.get_ticks_msec()
+	
+	while load_queue.size() > 0:
+		# Check time budget
+		var elapsed := Time.get_ticks_msec() - start_time
+		if elapsed >= max_load_time_ms and loaded_count > 0:
+			break  # Time budget exceeded
+		
+		# Also respect max chunks per frame
+		if loaded_count >= chunks_per_frame:
+			break
 		var chunk_pos: Vector3i = load_queue.pop_front()
 		
 		# Skip if already loaded (might have been loaded since queued)
@@ -129,6 +168,8 @@ func _process_load_queue() -> void:
 		
 		_load_chunk(chunk_pos)
 		loaded_count += 1
+	
+	return loaded_count
 
 # Load a chunk at the given chunk position
 func _load_chunk(chunk_pos: Vector3i) -> void:
