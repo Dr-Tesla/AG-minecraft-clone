@@ -114,62 +114,54 @@ func _update_lighting() -> void:
 	
 	var t := get_normalized_time()
 	
-	# Calculate sun angle (0 = sunrise at horizon, 0.5 = noon overhead, 1.0 = set)
-	var sun_progress: float
+	# Transition thresholds
+	const DAWN_END := 0.1
+	const DAY_END := 0.6
+	const SUNSET_END := 0.67 # NIGHT_START
+	const DUSK_END := 0.75
+	
 	var light_energy: float
 	var sky_color: Color
 	var ambient_color: Color
 	var sun_color: Color
 	
-	if t < NIGHT_START:
-		# Daytime - sun visible
-		sun_progress = t / NIGHT_START  # 0 to 1 during day
-		
-		if t < NOON:
-			# Morning - sun rising
-			var morning_t := t / NOON
-			light_energy = lerp(0.3, 1.0, morning_t)
-			sky_color = SKY_DAY
-			ambient_color = AMBIENT_DAY
-			sun_color = SUN_DAY.lerp(SUN_DAY, morning_t)
-		elif t < DUSK_START:
-			# Midday - full sun
-			light_energy = 1.0
-			sky_color = SKY_DAY
-			ambient_color = AMBIENT_DAY
-			sun_color = SUN_DAY
-		else:
-			# Evening - sun setting
-			var evening_t := (t - DUSK_START) / (NIGHT_START - DUSK_START)
-			light_energy = lerp(1.0, 0.3, evening_t)
-			sky_color = SKY_DAY.lerp(SKY_SUNSET, evening_t)
-			ambient_color = AMBIENT_DAY.lerp(AMBIENT_SUNSET, evening_t)
-			sun_color = SUN_DAY.lerp(SUN_SUNSET, evening_t)
+	# Five-Phase Interpolation
+	if t < DAWN_END:
+		# Dawn: Night to Day
+		var factor := t / DAWN_END
+		sky_color = SKY_NIGHT.lerp(SKY_DAY, factor)
+		ambient_color = AMBIENT_NIGHT.lerp(AMBIENT_DAY, factor)
+		light_energy = lerp(0.08, 1.0, factor)
+		sun_color = SUN_NIGHT.lerp(SUN_DAY, factor)
+	elif t < DAY_END:
+		# Full Day
+		sky_color = SKY_DAY
+		ambient_color = AMBIENT_DAY
+		light_energy = 1.0
+		sun_color = SUN_DAY
+	elif t < SUNSET_END:
+		# Sunset: Day to Sunset Orange
+		var factor := (t - DAY_END) / (SUNSET_END - DAY_END)
+		sky_color = SKY_DAY.lerp(SKY_SUNSET, factor)
+		ambient_color = AMBIENT_DAY.lerp(AMBIENT_SUNSET, factor)
+		light_energy = lerp(1.0, 0.3, factor)
+		sun_color = SUN_DAY.lerp(SUN_SUNSET, factor)
+	elif t < DUSK_END:
+		# Dusk: Sunset Orange to Deep Night
+		var factor := (t - SUNSET_END) / (DUSK_END - SUNSET_END)
+		sky_color = SKY_SUNSET.lerp(SKY_NIGHT, factor)
+		ambient_color = AMBIENT_SUNSET.lerp(AMBIENT_NIGHT, factor)
+		light_energy = lerp(0.3, 0.08, factor)
+		sun_color = SUN_SUNSET.lerp(SUN_NIGHT, factor)
 	else:
-		# Nighttime - sun below horizon (moon)
-		var night_t := (t - NIGHT_START) / (1.0 - NIGHT_START)
-		sun_progress = 1.0 + night_t  # Continue rotation
-		light_energy = 0.08  # Very dim moonlight (~30% of min day)
+		# Deep Night
 		sky_color = SKY_NIGHT
 		ambient_color = AMBIENT_NIGHT
+		light_energy = 0.08
 		sun_color = SUN_NIGHT
 	
-	# Rotate sun to match displayed time:
-	# In Godot DirectionalLight3D: rotation.x controls elevation
-	# - rot.x = 0: sun at horizon (sunrise/sunset)  
-	# - rot.x = -90: sun directly overhead (noon)
-	# - rot.x = -180: sun at opposite horizon (sunset)
-	# - rot.x = -270: sun directly below (midnight)
-	var sun_angle: float
-	if t < NIGHT_START:
-		# Day: 0 (sunrise) -> -90 (noon) -> -180 (sunset)
-		sun_angle = lerp(0.0, -180.0, sun_progress)
-	else:
-		# Night: -180 (sunset) -> -360 (sunrise)
-		var night_progress = (t - NIGHT_START) / (1.0 - NIGHT_START)
-		sun_angle = lerp(-180.0, -360.0, night_progress)
-	
-	sun_light.rotation_degrees.x = sun_angle
+	# Rotate sun continuously throughout the whole cycle (0 to -360)
+	sun_light.rotation_degrees.x = lerp(0.0, -360.0, t)
 	
 	# Apply lighting
 	sun_light.light_energy = light_energy
@@ -184,11 +176,10 @@ func _update_lighting() -> void:
 		# Update ambient lighting
 		env.ambient_light_color = ambient_color
 		
-		# Night ambient should be much dimmer
-		if light_energy < 0.3:
-			env.ambient_light_energy = 0.15  # Very dark night
-		else:
-			env.ambient_light_energy = lerp(0.4, 0.8, light_energy)
+		# Smooth ambient energy lerp (avoids code jumps)
+		# Maps light_energy 0.08 - 1.0 to ambient 0.15 - 0.8
+		var ambient_factor := (light_energy - 0.08) / (1.0 - 0.08)
+		env.ambient_light_energy = lerp(0.15, 0.8, ambient_factor)
 
 # Get normalized time (0.0 to 1.0 for full cycle)
 func get_normalized_time() -> float:
