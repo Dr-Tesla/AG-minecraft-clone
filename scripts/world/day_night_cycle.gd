@@ -179,8 +179,6 @@ func _update_lighting() -> void:
 	if world_env and world_env.environment:
 		var env := world_env.environment
 		# Update sky background color
-		if Engine.get_process_frames() % 60 == 0:  # Print every 60 frames
-			print("Sky color: ", sky_color, " light_energy: ", light_energy)
 		env.background_color = sky_color
 		
 		# Update ambient lighting

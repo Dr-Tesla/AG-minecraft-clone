@@ -14,9 +14,16 @@ extends CharacterBody3D
 @export var jump_velocity: float = 6.0
 @export var gravity: float = 20.0
 
+# Signals
+signal block_selected(index: int, type: Block.Type)
+
 # References
 var camera: PlayerCamera = null
-var block_interaction: Node = null
+var block_interaction: BlockInteraction = null
+
+# Block selection state
+var selected_block_index: int = 0
+var available_blocks: Array[Block.Type] = [Block.Type.DIRT, Block.Type.GRASS, Block.Type.STONE]
 
 # Current movement state
 var current_speed: float = 5.0
@@ -29,11 +36,40 @@ func _ready() -> void:
 	camera = $PlayerCamera as PlayerCamera
 	
 	# Block interaction component
-	block_interaction = $BlockInteraction
+	block_interaction = $BlockInteraction as BlockInteraction
+	
+	# Initial block selection
+	_select_block(0)
 	
 	# Configure floor detection for voxel terrain
 	floor_snap_length = 0.5  # Snap to floor within 0.5 units
 	floor_max_angle = deg_to_rad(60)  # Allow 60 degree slopes as floor
+
+func _unhandled_input(event: InputEvent) -> void:
+	if is_frozen:
+		return
+	
+	# Numeric key selection (1-3)
+	if event is InputEventKey and event.pressed:
+		if event.keycode == KEY_1: _select_block(0)
+		elif event.keycode == KEY_2: _select_block(1)
+		elif event.keycode == KEY_3: _select_block(2)
+	
+	# Mouse wheel scroll
+	if event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_select_block((selected_block_index - 1 + available_blocks.size()) % available_blocks.size())
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_select_block((selected_block_index + 1) % available_blocks.size())
+
+func _select_block(index: int) -> void:
+	selected_block_index = index
+	var block_type = available_blocks[index]
+	
+	if block_interaction:
+		block_interaction.set_current_block(block_type)
+	
+	emit_signal("block_selected", index, block_type)
 
 # Freeze or unfreeze player physics
 func set_frozen(frozen: bool) -> void:

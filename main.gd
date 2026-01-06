@@ -27,6 +27,7 @@ var day_night_cycle: DayNightCycle = null
 var sun_light: DirectionalLight3D = null
 var world_environment: WorldEnvironment = null
 var time_widget: TimeWidget = null
+var hotbar: Hotbar = null
 
 func _ready() -> void:
 	_setup_lighting()
@@ -191,6 +192,15 @@ func _setup_ui() -> void:
 	# Connect to day/night cycle
 	if day_night_cycle:
 		time_widget.setup(day_night_cycle)
+	
+	# Create hotbar
+	hotbar = Hotbar.new()
+	hotbar.name = "Hotbar"
+	canvas.add_child(hotbar)
+	
+	# Connect to player selection
+	if player:
+		player.block_selected.connect(func(index, _type): hotbar.update_selection(index))
 
 # Spawn player at world center
 func _spawn_player() -> void:
