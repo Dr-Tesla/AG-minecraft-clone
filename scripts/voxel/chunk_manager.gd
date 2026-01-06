@@ -178,11 +178,11 @@ func _load_chunk(chunk_pos: Vector3i) -> void:
 	chunk.chunk_manager = self
 	chunk.name = "Chunk_%d_%d_%d" % [chunk_pos.x, chunk_pos.y, chunk_pos.z]
 	
-	# Position in world space
-	chunk.global_position = Vector3(chunk_pos * Chunk.CHUNK_SIZE)
-	
 	add_child(chunk)
 	chunks[chunk_pos] = chunk
+	
+	# Position in world space (must be after add_child for global_position to work)
+	chunk.global_position = Vector3(chunk_pos * Chunk.CHUNK_SIZE)
 	
 	# Generate terrain for this chunk
 	if world_generator != null:

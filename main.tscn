@@ -32,7 +32,7 @@ height = 1.8
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
-starting_hour = 18
+starting_hour = 14
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_main")

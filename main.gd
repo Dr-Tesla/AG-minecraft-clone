@@ -52,17 +52,10 @@ func _generate_spawn_chunks() -> void:
 func _setup_material() -> void:
 	block_material = StandardMaterial3D.new()
 	
-	# Load or create texture atlas
-	var atlas_path := "res://textures/atlas.png"
-	var texture = null
-	
-	if ResourceLoader.exists(atlas_path):
-		texture = load(atlas_path)
-	
-	# Fall back to procedural atlas if loading failed
-	if texture == null:
-		print("Texture atlas not found or invalid, generating procedural texture")
-		texture = _create_procedural_atlas()
+	# Use procedural atlas (external atlas.png not required)
+	# To use an external texture, create textures/atlas.png and uncomment:
+	# var texture = load("res://textures/atlas.png")
+	var texture = _create_procedural_atlas()
 	
 	block_material.albedo_texture = texture
 	
