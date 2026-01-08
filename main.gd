@@ -28,6 +28,7 @@ var sun_light: DirectionalLight3D = null
 var world_environment: WorldEnvironment = null
 var time_widget: TimeWidget = null
 var hotbar: Hotbar = null
+var mob_manager: MobManager = null
 
 func _ready() -> void:
 	_setup_lighting()
@@ -37,6 +38,7 @@ func _ready() -> void:
 	_generate_spawn_chunks()
 	_spawn_player()
 	_setup_ui()
+	_setup_mobs()
 	
 	# Show FPS in title for debugging
 	_setup_debug()
@@ -218,6 +220,15 @@ func _spawn_player() -> void:
 	
 	# Unfreeze player now that chunks are loaded
 	player.set_frozen(false)
+
+# Setup Mob Manager
+func _setup_mobs() -> void:
+	mob_manager = MobManager.new()
+	mob_manager.name = "MobManager"
+	add_child(mob_manager)
+	
+	# Pass references
+	mob_manager.setup(player, chunk_manager)
 
 # Debug display
 func _setup_debug() -> void:
