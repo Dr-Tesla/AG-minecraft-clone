@@ -50,11 +50,11 @@ var day_count: int = 1
 # Colors
 const SKY_DAY := Color(0.4, 0.7, 1.0)  # Light blue
 const SKY_SUNSET := Color(1.0, 0.5, 0.2)  # Orange
-const SKY_NIGHT := Color(0.02, 0.02, 0.08)  # Very dark blue/black
+const SKY_NIGHT := Color(0.05, 0.05, 0.15)  # Slightly brighter night sky
 
 const AMBIENT_DAY := Color(1.0, 1.0, 1.0)
 const AMBIENT_SUNSET := Color(1.0, 0.7, 0.5)
-const AMBIENT_NIGHT := Color(0.1, 0.1, 0.2)  # Much darker ambient at night
+const AMBIENT_NIGHT := Color(0.25, 0.25, 0.35)  # Brighter ambient for visibility at night
 
 const SUN_DAY := Color(1.0, 1.0, 0.9)  # Slightly warm white
 const SUN_SUNSET := Color(1.0, 0.6, 0.3)  # Orange
@@ -131,7 +131,7 @@ func _update_lighting() -> void:
 		var factor := t / DAWN_END
 		sky_color = SKY_NIGHT.lerp(SKY_DAY, factor)
 		ambient_color = AMBIENT_NIGHT.lerp(AMBIENT_DAY, factor)
-		light_energy = lerp(0.08, 1.0, factor)
+		light_energy = lerp(0.25, 1.0, factor)
 		sun_color = SUN_NIGHT.lerp(SUN_DAY, factor)
 	elif t < DAY_END:
 		# Full Day
@@ -151,13 +151,13 @@ func _update_lighting() -> void:
 		var factor := (t - SUNSET_END) / (DUSK_END - SUNSET_END)
 		sky_color = SKY_SUNSET.lerp(SKY_NIGHT, factor)
 		ambient_color = AMBIENT_SUNSET.lerp(AMBIENT_NIGHT, factor)
-		light_energy = lerp(0.3, 0.08, factor)
+		light_energy = lerp(0.3, 0.25, factor)
 		sun_color = SUN_SUNSET.lerp(SUN_NIGHT, factor)
 	else:
 		# Deep Night
 		sky_color = SKY_NIGHT
 		ambient_color = AMBIENT_NIGHT
-		light_energy = 0.08
+		light_energy = 0.25
 		sun_color = SUN_NIGHT
 	
 	# Rotate sun continuously throughout the whole cycle (0 to -360)
@@ -166,6 +166,15 @@ func _update_lighting() -> void:
 	# Apply lighting
 	sun_light.light_energy = light_energy
 	sun_light.light_color = sun_color
+	
+	# Debug lighting state
+	if Engine.get_process_frames() % 60 == 0:
+		print("Time: %s | Light: %.2f | Ambient: %.2f | Sky: %s" % [
+			get_time_string(), 
+			light_energy,
+			world_env.environment.ambient_light_energy if world_env and world_env.environment else 0.0,
+			sky_color
+		])
 	
 	# Update environment if available
 	if world_env and world_env.environment:
@@ -177,9 +186,9 @@ func _update_lighting() -> void:
 		env.ambient_light_color = ambient_color
 		
 		# Smooth ambient energy lerp (avoids code jumps)
-		# Maps light_energy 0.08 - 1.0 to ambient 0.15 - 0.8
-		var ambient_factor := (light_energy - 0.08) / (1.0 - 0.08)
-		env.ambient_light_energy = lerp(0.15, 0.8, ambient_factor)
+		# Maps light_energy 0.25 - 1.0 to ambient 0.25 - 0.8
+		var ambient_factor := (light_energy - 0.25) / (1.0 - 0.25)
+		env.ambient_light_energy = lerp(0.25, 0.8, ambient_factor)
 
 # Get normalized time (0.0 to 1.0 for full cycle)
 func get_normalized_time() -> float:
