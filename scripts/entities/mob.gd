@@ -13,14 +13,16 @@ extends CharacterBody3D
 # Movement parameters
 @export var move_speed: float = 2.0
 @export var gravity: float = 20.0
-@export var jump_force: float = 5.0
+@export var hop_force: float = 6.0  # Slightly stronger than player jump
+@export var hop_interval: float = 0.3 # Time between hops while moving
 
 # AI State
 enum State { IDLE, WANDER, CHASE }
 var current_state: State = State.IDLE
 
-# AI Timer
+# AI and Hopping Timer
 var state_timer: float = 0.0
+var hop_timer: float = 0.0
 var move_direction: Vector3 = Vector3.ZERO
 
 # References
@@ -45,9 +47,17 @@ func _physics_process(delta: float) -> void:
 	if current_state != State.IDLE:
 		velocity.x = move_direction.x * move_speed
 		velocity.z = move_direction.z * move_speed
+		
+		# Rhythmic Hopping while moving
+		if is_on_floor():
+			hop_timer -= delta
+			if hop_timer <= 0:
+				velocity.y = hop_force
+				hop_timer = hop_interval
 	else:
 		velocity.x = move_toward(velocity.x, 0, move_speed * delta * 10)
 		velocity.z = move_toward(velocity.z, 0, move_speed * delta * 10)
+		hop_timer = 0 # Reset hop timer when stopped
 	
 	# Rotate towards movement direction
 	if velocity.x != 0 or velocity.z != 0:
@@ -56,9 +66,10 @@ func _physics_process(delta: float) -> void:
 	
 	move_and_slide()
 	
-	# If we hit a wall while wandering, maybe jump?
+	# Hurdle jumping (hopping over obstacles)
 	if is_on_wall() and is_on_floor():
-		velocity.y = jump_force
+		velocity.y = hop_force * 1.20
+		hop_timer = hop_interval # Reset timer so we don't double-hop immediately after hurdle
 
 func _update_ai(delta: float) -> void:
 	state_timer -= delta

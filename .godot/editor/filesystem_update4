@@ -2,3 +2,4 @@ res://main.tscn
 res://scripts/voxel/chunk_manager.gd
 res://scripts/ui/time_widget.gd
 res://scripts/world/day_night_cycle.gd
+res://scripts/entities/mob.gd
